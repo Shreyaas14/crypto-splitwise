@@ -54,7 +54,9 @@ ROOT_URLCONF = 'crypto_splitwise.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            BASE_DIR / 'crypto_splitwise/templates',
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

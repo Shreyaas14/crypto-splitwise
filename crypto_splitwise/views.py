@@ -1,5 +1,7 @@
 from django.shortcuts import render
+import os
+from django.conf import settings
 
 def home(request):
-    # Render the 'home.html' template when the home page is accessed
-    return render(request, 'home.html')
+    template_path = os.path.join(settings.BASE_DIR, 'crypto_splitwise/templates/home.html')
+    return render(request, template_path)
