@@ -1,1 +1,115 @@
 
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract ExpenseSharing {
+    struct Participant {
+        address account;
+        int256 balance; // Positive: owes money, Negative: is owed money
+    }
+
+    struct Group {
+        uint256 id;
+        string name;
+        address admin;
+        address[] participants;
+        mapping(address => Participant) participantInfo;
+        uint256 totalExpenses;
+    }
+
+    mapping(uint256 => Group) public groups;
+    uint256 public groupCount;
+
+    // Events for logging
+    event GroupCreated(uint256 groupId, string name, address admin);
+    event ParticipantAdded(uint256 groupId, address participant);
+    event ParticipantRemoved(uint256 groupId, address participant);
+    event ExpenseAdded(uint256 groupId, string description, uint256 amount);
+
+    // Function to create a new group
+    function createGroup(string memory _name) public {
+        groupCount++;
+        Group storage newGroup = groups[groupCount];
+        newGroup.id = groupCount;
+        newGroup.name = _name;
+        newGroup.admin = msg.sender;
+        newGroup.participants.push(msg.sender);
+        newGroup.participantInfo[msg.sender] = Participant({account: msg.sender, balance: 0});
+
+        emit GroupCreated(groupCount, _name, msg.sender);
+    }
+
+    // Function to add a participant to a group
+    function addParticipant(uint256 _groupId, address _participant) public {
+        Group storage group = groups[_groupId];
+        require(msg.sender == group.admin, "Only admin can add participants");
+        require(group.participantInfo[_participant].account == address(0), "Participant already exists");
+
+        group.participants.push(_participant);
+        group.participantInfo[_participant] = Participant({account: _participant, balance: 0});
+
+        emit ParticipantAdded(_groupId, _participant);
+    }
+
+    // Function to remove a participant from a group
+    function removeParticipant(uint256 _groupId, address _participant) public {
+        Group storage group = groups[_groupId];
+        require(msg.sender == group.admin, "Only admin can remove participants");
+        require(group.participantInfo[_participant].account != address(0), "Participant does not exist");
+        require(group.participantInfo[_participant].balance == 0, "Cannot remove participant with unsettled balance");
+
+        // Remove participant from the participants array
+        uint256 index;
+        for (uint256 i = 0; i < group.participants.length; i++) {
+            if (group.participants[i] == _participant) {
+                index = i;
+                break;
+            }
+        }
+        group.participants[index] = group.participants[group.participants.length - 1];
+        group.participants.pop();
+
+        // Delete participant's mapping entry
+        delete group.participantInfo[_participant];
+
+        emit ParticipantRemoved(_groupId, _participant);
+    }
+
+    // Function to add an expense to a group
+    function addExpense(
+        uint256 _groupId,
+        string memory _description,
+        uint256 _amount,
+        address[] memory _participants,
+        uint256[] memory _weights
+    ) public {
+        Group storage group = groups[_groupId];
+        require(msg.sender == group.admin, "Only admin can add expenses");
+        require(_participants.length == _weights.length, "Participants and weights must match");
+
+        uint256 totalWeight = 0;
+        for (uint256 i = 0; i < _weights.length; i++) {
+            totalWeight += _weights[i];
+        }
+
+        for (uint256 i = 0; i < _participants.length; i++) {
+            require(group.participantInfo[_participants[i]].account != address(0), "Participant not in group");
+            uint256 share = (_amount * _weights[i]) / totalWeight;
+            group.participantInfo[_participants[i]].balance += int256(share);
+        }
+
+        group.totalExpenses += _amount;
+
+        emit ExpenseAdded(_groupId, _description, _amount);
+    }
+
+    // Function to get participants of a group
+    function getParticipants(uint256 _groupId) public view returns (address[] memory) {
+        return groups[_groupId].participants;
+    }
+
+    // Function to get a participant's balance in a group
+    function getBalance(uint256 _groupId, address _participant) public view returns (int256) {
+        return groups[_groupId].participantInfo[_participant].balance;
+    }
+}
